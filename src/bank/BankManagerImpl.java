@@ -19,17 +19,21 @@ public class BankManagerImpl implements BankManager {
     //
     // example of a create table statement executed by createDB()
     private static final String CREATE_TABLE_ACCOUNTS = "create table ACCOUNTS (" + 
-	    "NUMBER int, " + 
+	    "NUMBER int not null, " + 
 	    "BALANCE double, " + 
 	    "primary key (NUMBER)" + 
 	    ")";
     
     private static final String CREATE_TABLE_OPERATIONS = "create table OPERATIONS (" + 
-    	    "NUMBER int, " + 
+    	    "NUMBER int not null, " + 
     	    "ACCOUNT int, " + 
     	    "DATE int, " + 
-    	    "primary key (NUMBER)" + 
+    	    "primary key (NUMBER)," + 
+    	    "constraint account_fk foreign key (ACCOUNT) references ACCOUNTS(NUMBER) " +
     	    ")";
+    
+    private static final String DROP_TABLE_OPERATIONS = "drop table OPERATIONS;";
+    private static final String DROP_TABLE_ACCOUNTS = "drop table ACCOUNTS;";
   
     private Connection con;
     
@@ -62,11 +66,22 @@ public class BankManagerImpl implements BankManager {
 
     }
 
-    @Override
+    /**
+     * Drop the existing tables if so, and creates the tables accounts and operations in the database
+     */
     public void createDB() throws SQLException {
 	// TODO Auto-generated method stub
     	//create a new statement object
     	Statement statement = con.createStatement();
+    	
+    	//drop tables if exists
+    	try{
+    		statement.executeUpdate(DROP_TABLE_OPERATIONS);
+    		statement.executeUpdate(DROP_TABLE_ACCOUNTS);
+    	}catch(Exception e){
+    		con.commit();
+    	}
+    	
     	//Execute two table creation queries
     	statement.executeUpdate(CREATE_TABLE_ACCOUNTS);
     	statement.executeUpdate(CREATE_TABLE_OPERATIONS);

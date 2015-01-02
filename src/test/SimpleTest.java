@@ -97,47 +97,48 @@ public class SimpleTest {
     //
     public static void main(String[] args) {
 
-	// check parameters
-	if (args.length != 3) {
-	    System.err.println("usage: SimpleTest <url> <user> <password>");
-	    System.exit(-1);
-	}
+		// check parameters
+		if (args.length != 3) {
+		    System.err.println("usage: SimpleTest <url> <user> <password>");
+		    System.exit(-1);
+		}
+	
+		try {
+		    // create ReservationManager object
+		    BankManager manager = new BankManagerImpl(args[0], args[1], args[2]);
+	
+		    // create the database
+		    manager.createDB();
+		    
+		    // populate the database
+		    for (int i = 0; i < MAX_ACCOUNTS; i++) {
+			manager.createAccount(i + 1);
+		    }
+	
+		    // execute single-user tests
+		    singleUserTests(manager, "single-customer");
+	
+		    // execute multi-user tests
+		    for (int i = 0; i < MAX_CUSTOMERS; i++) {
+			BankManager m = new BankManagerImpl(args[0], args[1], args[2]);
+			new CustomerEmulator(m, "multi-customer" + i).start();
+		    }
+		    
+		} catch (Exception e) {
+		    System.err.println("test aborted: " + e);
+		    e.printStackTrace();
+		}
+	
+		// print test results
+		if (testTotal == 0) {
+		    System.out.println("no test performed");
+		} else {
+		    String r = "test results: ";
+		    r += "total=" + testTotal;
+		    r += ", ok=" + testOK + "(" + ((testOK * 100) / testTotal) + "%)";
+		    System.out.println(r);
+		}
 
-	try {
-	    // create ReservationManager object
-	    BankManager manager = new BankManagerImpl(args[0], args[1], args[2]);
-
-	    // create the database
-	    manager.createDB();
-	    
-	    // populate the database
-	    for (int i = 0; i < MAX_ACCOUNTS; i++) {
-		manager.createAccount(i + 1);
-	    }
-
-	    // execute single-user tests
-	    singleUserTests(manager, "single-customer");
-
-	    // execute multi-user tests
-	    for (int i = 0; i < MAX_CUSTOMERS; i++) {
-		BankManager m = new BankManagerImpl(args[0], args[1], args[2]);
-		new CustomerEmulator(m, "multi-customer" + i).start();
-	    }
-
-	} catch (Exception e) {
-	    System.err.println("test aborted: " + e);
-	    e.printStackTrace();
-	}
-
-	// print test results
-	if (testTotal == 0) {
-	    System.out.println("no test performed");
-	} else {
-	    String r = "test results: ";
-	    r += "total=" + testTotal;
-	    r += ", ok=" + testOK + "(" + ((testOK * 100) / testTotal) + "%)";
-	    System.out.println(r);
-	}
-
+		
     }
 }
