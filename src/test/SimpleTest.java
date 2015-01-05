@@ -47,7 +47,7 @@ public class SimpleTest {
 	
 		public void run() {
 		    System.out.println(this + ": starting");
-		    // TODO complete the test
+		    // TODO complete the test 
 		    System.out.println(this + ": exiting");
 		}
 
@@ -114,10 +114,11 @@ public class SimpleTest {
 		    for (int i = 0; i < MAX_ACCOUNTS; i++) {
 			manager.createAccount(i + 1);
 		    }
-	
+		    
 		    // execute single-user tests
 		    singleUserTests(manager, "single-customer");
-	
+		   
+		    
 		    // execute multi-user tests
 		    for (int i = 0; i < MAX_CUSTOMERS; i++) {
 			BankManager m = new BankManagerImpl(args[0], args[1], args[2]);
