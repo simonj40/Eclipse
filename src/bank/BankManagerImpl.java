@@ -1,6 +1,7 @@
 package bank;
 
 import java.sql.*;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -22,24 +23,51 @@ public class BankManagerImpl implements BankManager {
     private static final String CREATE_TABLE_ACCOUNTS = "create table ACCOUNTS (" + 
 	    "NUMBER int not null, " + 
 	    "BALANCE double, " + 
-	    "primary key (NUMBER)" + 
+	    "primary key (NUMBER)" +	   
 	    ")";
+    //DateCreated DATETIME NOT NULL DEFAULT(GETDATE())
     
-    private static final String CREATE_TABLE_OPERATIONS = "create table OPERATIONS (" + 
+   private static final String CREATE_TABLE_OPERATIONS = "create table OPERATIONS (" + 
+		   	"ID int NOT NULL AUTO_INCREMENT, " +
     	    "NUMBER int not null, " + 
     	    "AMOUNT double, " + 
-    	    "DATE date, " + 
-    	    "primary key (NUMBER)," + 
+    	    "DATE timestamp not null default NOW(), " +
+    	    "primary key (ID)," + 
     	    "constraint account_fk foreign key (NUMBER) references ACCOUNTS(NUMBER) " +
     	    ")";
+   
+   /**
+    * Trigger to check balance is not negative upon update of account balance
+    * It was necessary to use DBMS specific (non-standard SQL) language in order to force the trigger to raise an
+    * exception in MYSQL database (ver. 5.x)
+    */
+   private static final String CREATE_TRIGGER_VALIDATE_BALANCE = "CREATE TRIGGER BalanceUpdateTrigger " + 
+		   "BEFORE UPDATE ON ACCOUNTS " +
+		   "FOR EACH ROW " +
+		   "IF NEW.BALANCE < 0 THEN " +
+		   "SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Balance cannot be less than 0. This transaction has been reversed.';" +
+		   "END IF; ";
+   
+   
+   /**
+    * Trigger to automatically log update operations performed on accounts
+    * It was necessary to use DBMS specific (non-standard SQL) language in order to force the trigger to raise an
+    * exception in MYSQL database (ver. 5.x)
+    */
+   private static final String CREATE_TRIGGER_LOG_UPDATE_OPERATIONS = "CREATE TRIGGER OperationsLogUpdateTrigger " + 
+		   "AFTER UPDATE ON ACCOUNTS " +
+		   "FOR EACH ROW " +
+		   "BEGIN " +
+		   "INSERT INTO OPERATIONS(NUMBER, AMOUNT, DATE) VALUES(NEW.NUMBER, (NEW.BALANCE-OLD.BALANCE), SYSDATE()); " +
+		   "END ";   
     
     private static final String DROP_TABLE_OPERATIONS = "drop table OPERATIONS;";
     private static final String DROP_TABLE_ACCOUNTS = "drop table ACCOUNTS;";
     
     private static final String INSERT_ACCOUNT = "insert into ACCOUNTS (NUMBER, BALANCE) values (?, 0) ;";
     private static final String SELECT_BALANCE = "select BALANCE from ACCOUNTS where NUMBER=";
-    private static final String UPDATE_BALANCE = "update ACCOUNTS set BALANCE=? where NUMBER=? ;";
-    private static final String SELECT_OPERATIONS = "select * from OPERATIONS where DATE between ";
+    private static final String UPDATE_BALANCE = "update ACCOUNTS set BALANCE=(BALANCE+?) where NUMBER=? ;";
+    private static final String SELECT_OPERATIONS = "select * from OPERATIONS ";
   
     private Connection con;
     
@@ -116,6 +144,18 @@ public class BankManagerImpl implements BankManager {
     		System.out.println("System failed to create database tables : " + e.getMessage());
     	}
     	
+    	try{
+    		//Execute two trigger creation queries
+        	statement.executeUpdate(CREATE_TRIGGER_VALIDATE_BALANCE);
+        	statement.executeUpdate(CREATE_TRIGGER_LOG_UPDATE_OPERATIONS);
+        	//Commit the executed queries
+        	con.commit();
+    	}catch(Exception e){
+    		//roll-back the transaction if errors occured
+    		con.rollback();
+    		System.out.println("System failed to create triggers: " + e.getMessage());
+    	}
+    	
     }
 
     /**
@@ -186,55 +226,48 @@ public class BankManagerImpl implements BankManager {
      * 		the account new balance 
      */
     public double addBalance(int number, double amount) throws SQLException {
-    	//retrives the balance and calculate its new value
-    	double balance = getBalance(number);
-    	double newBalance = balance + amount;
+    	
     	try {
     		//set the parameters in the prepared statement an execute it
-			psUpdateBalance.setDouble(1, newBalance);
+			psUpdateBalance.setDouble(1, amount);
 			psUpdateBalance.setInt(2, number);
 			psUpdateBalance.execute();
 			//commit the transaction
 			con.commit();
 		} catch (Exception e) {
-			//roll-back the transaction if errors occured
-			con.rollback();
-			e.printStackTrace();
-			//set newbalance to its original value since the update failed
-			newBalance = balance;
+			/**
+			 * If transaction causes the balance of account to be less than 0, a trigger will raise a validation exception
+			 * This will cause DBMS to automatically roll back the transaction.
+			 */
+			System.err.println("Error: " + e.getMessage());
+			
 		}
     	
-    	return newBalance;
+    	return getBalance(number);
     }
 
     
     @Override
     public boolean transfer(int from, int to, double amount) throws SQLException {
-    	boolean success = true;
-    	
-    	//retrives the balances and calculates their new values
-    	double balanceFrom = getBalance(from);
-    	double newBalanceFrom = balanceFrom - amount;
-
-    	double balanceto = getBalance(to);
-    	double newBalanceTo = balanceto + amount;
-    	
+    	boolean success = true;    	
     	try {
 			//set prepared statements parameters 
-			psUpdateBalance.setDouble(1, newBalanceFrom);
+			psUpdateBalance.setDouble(1, -amount);
 			psUpdateBalance.setInt(2, from);
 			psUpdateBalance.execute();
 			
-			psUpdateBalance.setDouble(1, newBalanceTo);
+			psUpdateBalance.setDouble(1, amount);
 			psUpdateBalance.setInt(2, to);
 			psUpdateBalance.execute();
 			//commit the transaction
 			con.commit();
 		} catch (Exception e) {
 			success = false;
-			//roll-back the transaction if errors occured
-			con.rollback();
-			e.printStackTrace();
+			/**
+			 * If transfer causes balance of crediting account to be less than 0, a trigger will raise an exception
+			 * This will cause the DBMS to automatically roll back he commit.
+			 */
+			System.err.println("Error: " + e.getMessage());		
 			
 		}
     	
@@ -243,23 +276,27 @@ public class BankManagerImpl implements BankManager {
 
     @Override
     public List<Operation> getOperations(int number, Date from, Date to) throws SQLException {
-    	
+    	//date formatter to ensure date format works with the date generted by MySQL DBMS during logging
+    	SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+    	//array list to return
     	List<Operation> list = new ArrayList<Operation>();
-    	
-    	java.sql.Date from1 = new java.sql.Date(from.getTime());
-    	java.sql.Date to1 = new java.sql.Date(to.getTime());
-    	
-    	
-    	String query = SELECT_OPERATIONS + from1.toString() + " and " + to1.toString() + " and NUMBER=" + number + ";";
+    	//Operation object to be added to array list
+    	Operation objOperation;
+    	try{
+    	String query = SELECT_OPERATIONS + "where (DATE between '"+ sdf.format(from) +"' and '"+sdf.format(to)+"')" + " and NUMBER=" + number + ";";
     	result = statement.executeQuery(query);
-    	
+    	//iterate through resultset and populate Operation list
     	while( result.next() ){
-
-    	    double amount = result.getDouble(2);
-    	    Date date = result.getDate(3);
-    		Operation op = new Operation(number, amount, date); 
-    		list.add(op);
+    		objOperation = new Operation(result.getInt(2), result.getDouble(3), result.getDate(4));
+    	    list.add(objOperation);
     	}
+    	
+    	}catch(Exception e){
+    		/**
+			 * If query fails catch exception...
+			 */
+			System.err.println("Error: " + e.getMessage());		
+    	}    	
     	
     	return list;
     }

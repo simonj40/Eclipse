@@ -46,9 +46,40 @@ public class SimpleTest {
 		}
 	
 		public void run() {
-		    System.out.println(this + ": starting");
-		    // TODO complete the test 
-		    System.out.println(this + ": exiting");
+		    System.out.println(this + ": starting for "+ customer);
+		    int accountNumBase = (int)Thread.currentThread().getId();
+		    int accNum1 = accountNumBase * 1;
+		    int accNum2 = accountNumBase * 2;
+		    
+		    try{
+		    //create two accounts for tests (per customer)
+		    manager.createAccount(accNum1);
+		    manager.createAccount(accNum2);
+		    
+		    // deposit 1000 on account #1
+			double b = manager.addBalance(accNum1, 1000.0);
+			check("addBalance for "+ customer,  b == 1000.0);
+		
+			// transfer 250 from account #1 to account #2
+			boolean s = manager.transfer(accNum1, accNum2, 250.0);
+			check("transfer-1 for "+ customer,  s);
+			check("transfer-2 for "+ customer,  manager.getBalance(accNum1) == 750.0);
+			check("transfer-3 for "+ customer,  manager.getBalance(accNum2) == 250.0);
+			
+			// check operations on account #1 between yesterday and now
+			Date now = new Date();
+			List<Operation> o1 = manager.getOperations(accNum1, new Date(now.getTime() - 24*60*60*1000), now);
+			System.out.println("operations on account #1 for "+ customer + " = " + o1);
+			check("getOperations-1 for "+ customer, o1.size() == 2);
+			List<Operation> o2 = manager.getOperations(accNum2, new Date(now.getTime() - 24*60*60*1000), now);
+			System.out.println("operations on account #2 for "+ customer + " = " + o2);
+			check("getOperations-2 for "+ customer, o2.size() == 1);
+		    }
+		    catch(Exception e){
+		    	System.err.println("multi-user test aborted for "+ customer + e);
+			    e.printStackTrace();
+		    }
+		    System.out.println(this + ": exiting for "+ customer);
 		}
 
     }
@@ -73,11 +104,11 @@ public class SimpleTest {
 		double b = m.addBalance(1, 1000.0);
 		check("addBalance",  b == 1000.0);
 	
-		// transfert 500 from account #1 to account #2
+		// transfer 250 from account #1 to account #2
 		boolean s = m.transfer(1, 2, 250.0);
-		check("transfert-1",  s);
-		check("transfert-2",  m.getBalance(1) == 750.0);
-		check("transfert-3",  m.getBalance(2) == 250.0);
+		check("transfer-1",  s);
+		check("transfer-2",  m.getBalance(1) == 750.0);
+		check("transfer-3",  m.getBalance(2) == 250.0);
 		
 		// check operations on account #1 between yesterday and now
 		Date now = new Date();
@@ -86,7 +117,7 @@ public class SimpleTest {
 		check("getOperations-1", o1.size() == 2);
 		List<Operation> o2 = m.getOperations(2, new Date(now.getTime() - 24*60*60*1000), now);
 		System.out.println("operations on account #2 = " + o2);
-		check("getOperations-1", o2.size() == 1);
+		check("getOperations-2", o2.size() == 1);
 		
 		// TODO complete the test
 		
@@ -116,10 +147,16 @@ public class SimpleTest {
 		    }
 		    
 		    // execute single-user tests
+		    System.out.println("Starting single user tests...");
 		    singleUserTests(manager, "single-customer");
-		   
+		    System.out.println("...end of single user tests");
 		    
 		    // execute multi-user tests
+		    //call CreateDB() method to re-initialize database
+		    //this prevents any possible conflict between PKs used in single user tests and multi user tests
+		    System.out.println("Preparing database for multi user tests...");
+		    manager.createDB();
+		    System.out.println("Starting multi user tests...");
 		    for (int i = 0; i < MAX_CUSTOMERS; i++) {
 			BankManager m = new BankManagerImpl(args[0], args[1], args[2]);
 			new CustomerEmulator(m, "multi-customer" + i).start();
