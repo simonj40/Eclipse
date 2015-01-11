@@ -130,16 +130,7 @@ public class BankManagerImpl implements BankManager {
     		//Execute table creation statements
         	statement.executeUpdate(CREATE_TABLE_ACCOUNTS);
         	statement.executeUpdate(CREATE_TABLE_OPERATIONS);
-        	//Commit the executed queries
-        	con.commit();
-    	}catch(Exception e){
-    		//roll-back the transaction if errors occured
-    		con.rollback();
-    		System.out.println("System failed to create database tables : " + e.getMessage());
-    	}
-    	
-    	try{
-    		//Execute two trigger creation queries
+        	//Execute two trigger creation queries
         	statement.executeUpdate(CREATE_TRIGGER_VALIDATE_BALANCE);
         	statement.executeUpdate(CREATE_TRIGGER_LOG_UPDATE_OPERATIONS);
         	//Commit the executed queries
@@ -147,7 +138,7 @@ public class BankManagerImpl implements BankManager {
     	}catch(Exception e){
     		//roll-back the transaction if errors occured
     		con.rollback();
-    		System.out.println("System failed to create triggers: " + e.getMessage());
+    		System.out.println("System failed to create database tables : " + e.getMessage());
     	}
     	
     }

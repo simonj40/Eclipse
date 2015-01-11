@@ -121,6 +121,32 @@ public class SimpleTest {
 		
 		// TODO complete the test
 		
+		// deposit 500 on account #2
+		b = m.addBalance(2, 500.0);
+		check("addBalance",  b == 750.0);
+	
+		// transfer 250 from account #1 to account #3
+		s = m.transfer(1, 3, 250.0);
+		check("transfer-1",  s);
+		check("transfer-2",  m.getBalance(1) == 500.0);
+		check("transfer-3",  m.getBalance(3) == 250.0);
+		
+		// check operations on account #1 between yesterday and now
+		now = new Date();
+		o1 = m.getOperations(1, new Date(now.getTime() - 24*60*60*1000), now);
+		System.out.println("operations on account #1 = " + o1);
+		check("getOperations-3", o1.size() == 3);
+		o2 = m.getOperations(2, new Date(now.getTime() - 24*60*60*1000), now);
+		System.out.println("operations on account #2 = " + o2);
+		check("getOperations-4", o2.size() == 2);
+		List<Operation> o3 = m.getOperations(3, new Date(now.getTime() - 24*60*60*1000), now);
+		System.out.println("operations on account #3 = " + o3);
+		check("getOperations-5", o3.size() == 1);
+		
+		
+		
+		
+		
     }
 
     //
