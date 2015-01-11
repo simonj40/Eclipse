@@ -61,8 +61,9 @@ public class BankManagerImpl implements BankManager {
 		   "INSERT INTO OPERATIONS(NUMBER, AMOUNT, DATE) VALUES(NEW.NUMBER, (NEW.BALANCE-OLD.BALANCE), SYSDATE()); " +
 		   "END ";   
     
-    private static final String DROP_TABLE_OPERATIONS = "drop table OPERATIONS;";
-    private static final String DROP_TABLE_ACCOUNTS = "drop table ACCOUNTS;";
+    private static final String DROP_TABLE_OPERATIONS = "drop table if exists OPERATIONS;";
+    private static final String DROP_TABLE_ACCOUNTS = "drop table if exists ACCOUNTS;";
+    
     
     private static final String INSERT_ACCOUNT = "insert into ACCOUNTS (NUMBER, BALANCE) values (?, 0) ;";
     private static final String SELECT_BALANCE = "select BALANCE from ACCOUNTS where NUMBER=";
@@ -115,25 +116,18 @@ public class BankManagerImpl implements BankManager {
     public void createDB() throws SQLException {
 
     	try {
-			//drop tables if exists
-			statement.executeUpdate(DROP_TABLE_OPERATIONS);
+    		//drop tables if they exists in database...
+    		statement.executeUpdate(DROP_TABLE_OPERATIONS);
+    		statement.executeUpdate(DROP_TABLE_ACCOUNTS);
 			con.commit();
 		} catch (Exception e1) {
 			// TODO Auto-generated catch block
 			//e1.printStackTrace();
-		}
-    	
-    	try {
-			statement.executeUpdate(DROP_TABLE_ACCOUNTS);
-			con.commit();
-		} catch (Exception e1) {
-			// TODO Auto-generated catch block
-			//e1.printStackTrace();
-		}
+		}   	    	   	
     	
     	
     	try{
-    		//Execute two table creation queries
+    		//Execute table creation statements
         	statement.executeUpdate(CREATE_TABLE_ACCOUNTS);
         	statement.executeUpdate(CREATE_TABLE_OPERATIONS);
         	//Commit the executed queries
